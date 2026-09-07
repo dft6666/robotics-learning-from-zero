@@ -1,308 +1,320 @@
-# Windows + Ubuntu 双系统安装与装错版本后的重装指南
+# Windows 上安装 Ubuntu 双系统：从准备到完成
 
-> 整理日期：2026-09-07。目标：保留 Windows，安装准确的 **Ubuntu 22.04.4 Desktop AMD64**，并说明如何替换已安装的新版 Ubuntu。
->
-> 本文基于一次真实安装对话、用户截图和官方资料。已确认：Windows 使用 UEFI；C/D/E 开启 BitLocker；从 E 盘分出 300GB；旧 Ubuntu 已装入独立 ext4 分区并能启动。**尚未收到成功重装 22.04.4 的验证结果**。重装章节是按已核实布局给出的操作方案，不冒充已完成记录。
+**目标：保留 Windows，使用 Ventoy 安装 Ubuntu 22.04.4 桌面版。** 本文以这次实际使用的“UEFI + 一块约 1TB 硬盘 + 从 E 盘分出 300GB”为例。
 
-## 目录与阅读路线
+正文按顺序操作，每一步都写明“怎么做”和“完成后看到什么”。**已经装好错误版本的 Ubuntu，请直接看[附录 A：替换旧版本](#reinstall)，不要再次压缩 E 盘。** 其他报错和概念解释统一放在文末。
 
-- [1. 先分清内存、分区和安装镜像](#concepts)
-- [2. 下载准确版本及准备材料](#prepare)
-- [3. Windows：检查启动模式和 BitLocker](#windows)
-- [4. 分配 300GB 硬盘空间](#space)
-- [5. 制作 Ventoy 启动 U 盘](#ventoy)
-- [6. 从 U 盘启动与 Secure Boot 排障](#boot)
-- [7. 首次安装 Ubuntu](#install)
-- [8. 已装错版本：替换成 22.04.4](#reinstall)
-- [9. 重启与双系统验收](#verify)
-- [10. 本次常见问题](#faq)
-- [11. 只读检查命令与最终核对](#checks)
-- [12. 来源和图片说明](#sources)
+## 操作顺序
 
-**首次安装**按第 2～7、9 节操作；**已经安装错版本**先读第 8 节，不要再次压缩或删除 E 盘。
+[步骤 1：准备文件和工具](#prepare) → [步骤 2：检查 Windows](#windows) → [步骤 3：分出磁盘空间](#space) → [步骤 4：制作启动 U 盘](#ventoy) → [步骤 5：从 U 盘启动](#boot) → [步骤 6：填写安装选项](#install-options) → [步骤 7：选择分区并安装](#install) → [步骤 8：重启并检查](#verify)
 
-<a id="concepts"></a>
-## 1. 先分清内存、分区和安装镜像
-
-### 1.1 运行内存不是硬盘容量
-
-- **RAM（运行内存）**是程序运行时使用的空间。本次 `free -h` 照片中总量约 30GiB、已用约 2.3GiB，是正常系统占用。双系统切换启动时不必把 RAM 永久分成两半。
-- **硬盘空间**用于保存系统、软件和文件。本次给 Ubuntu 的 **300GB** 属于这一类。
-- **swap（交换空间）**是内存辅助空间。照片中的 8GiB swap 不代表系统分区大小，也不要求新安装照建 8GB swap 分区。
-
-查内存用 `free -h`；查当前 Ubuntu 系统分区容量用 `df -h /`；查磁盘布局用 `lsblk`。
-
-### 1.2 C、D、E 不一定是三块硬盘
-
-本次 C/D/E 都位于同一块约 1TB 内部硬盘。Windows 显示“磁盘 0”，Linux 显示 `/dev/nvme0n1`。
-
-从 E 盘压缩出的 300GB 是独立未分配空间。安装后 Ubuntu 使用自己的分区，**不在剩余 E 盘的某个文件夹里**。
-
-### 1.3 ISO、Ventoy、试用系统与已安装系统
-
-ISO 是安装镜像；Ventoy 让 U 盘能够启动镜像。复制 ISO 只代表准备好了安装介质，**不代表完成安装**。
-
-“Try Ubuntu”是从 U 盘启动的试用环境。安装到硬盘后，拔掉 U 盘仍能启动的才是已安装系统。删除 U 盘里的旧 ISO 不会卸载硬盘中的 Ubuntu；换 ISO 也不会自动降级旧系统。
+---
 
 <a id="prepare"></a>
-## 2. 下载准确版本及准备材料
+## 步骤 1：准备文件和工具
 
-### 2.1 先确认版本，再下载
+### 1. 下载 Ventoy
 
-本次最初误下载并安装了 26 系列，之后明确需要 **22.04.4**。22.04、22.04.4、22.04.5 的要求精度不同。课程指定 22.04.4 时，应按指定版本准备，不用其他维护版本替代。
+1. 打开 [Ventoy 官方下载页](https://www.ventoy.net/en/download.html)。
+2. 下载适用于 Windows 的压缩包，文件名类似 `ventoy-版本号-windows.zip`。
+3. 解压到一个容易找到的文件夹，后面需要运行里面的 `Ventoy2Disk.exe`。
 
-官方文件：
+### 2. 下载 Ubuntu 22.04.4
 
-- [Ubuntu 22.04.4 归档目录](https://old-releases.ubuntu.com/releases/22.04.4/)
-- [Ubuntu 22.04.4 桌面版 ISO 直接下载](https://old-releases.ubuntu.com/releases/22.04.4/ubuntu-22.04.4-desktop-amd64.iso)
-- [SHA256SUMS 校验文件](https://old-releases.ubuntu.com/releases/22.04.4/SHA256SUMS)
+点击 [Ubuntu 22.04.4 桌面版官方下载](https://old-releases.ubuntu.com/releases/22.04.4/ubuntu-22.04.4-desktop-amd64.iso)。
 
-文件名必须为：
+下载完成后，确认文件名是：
 
 ```text
 ubuntu-22.04.4-desktop-amd64.iso
 ```
 
-`desktop` 表示桌面版；`amd64` 适用于通常的 64 位 Intel/AMD PC，不是仅支持 AMD。不要用 server、ARM、WSL、torrent 文件代替该 ISO。
+**这次需要准确的 22.04.4。** 不要选 22.04.5、26 系列或 server 版；ISO 文件不用解压。下载完整性检查方法见[附录 D](#checks)。
 
-可在 Windows PowerShell 检查文件完整性，把示例路径换为实际下载位置：
+### 3. 准备 U 盘和备份
 
-```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Downloads\ubuntu-22.04.4-desktop-amd64.iso'
-```
+1. 准备一个容量足够的 U 盘，建议 16GB 或以上；本次使用约 64GB U 盘。
+2. 把 U 盘内需要的文件复制出来，首次安装 Ventoy 会清除 U 盘。
+3. 备份电脑上需要保留的文件，给笔记本接上电源。
+4. 用手机打开本指南，方便电脑重启时继续查看。
 
-对比官方 `SHA256SUMS` 中**同一文件名**的哈希。复制到 U 盘后也可以检查目标文件，确认复制完整。
-
-### 2.2 安装更新与版本显示
-
-需要先得到镜像原始的 22.04.4 环境时，安装阶段先断网、不选“安装时下载更新”。后续正常更新可能让版本显示成为较新的 **22.04.x**，这与跨到 24.04/26.04 的发行版升级不同。
-
-不要为了永久保留“22.04.4”字符串而长期关闭安全更新。若课程严格依赖内核或软件版本，应记录 `uname -r` 和关键软件版本，再根据项目要求管理环境；同一个系统版本字符串不保证软件环境完全一致。
-
-### 2.3 材料清单
-
-- 容量足够的 U 盘，16GB 或以上较宽裕；本次使用约 64GB U 盘。
-- 需要保留的 Windows 文件备份；重装还需备份旧 Ubuntu 文件。
-- 手机或其他设备上可查看的 BitLocker 恢复密钥。
-- 电源连接稳定；保存正在做的工作；把本指南放到手机上方便重启时查看。
+**完成标志：**有一个已解压的 Ventoy 文件夹、一个准确的 22.04.4 ISO，以及准备好的 U 盘。
 
 <a id="windows"></a>
-## 3. Windows：检查启动模式和 BitLocker
+## 步骤 2：检查 Windows 的启动模式和加密状态
 
-### 3.1 查 BIOS 模式
+### 1. 确认 UEFI 模式
 
-1. 按 `Win + R`，输入 `msinfo32` 并回车。
-2. 在“系统摘要”找到“BIOS 模式”。
-3. 本次结果是 **UEFI**，因此 Ubuntu 安装 U 盘也应以 UEFI 模式启动。
+1. 按键盘 **`Win + R`**，打开“运行”。
+2. 输入 **`msinfo32`**，按回车。
+3. 在“系统摘要”找到 **“BIOS 模式”**。
+4. 本次电脑显示 **UEFI**，后面安装 Ubuntu 时也使用 UEFI 启动。
 
-曾把命令写成 `msifo32`，少了一个 `n`。正确的是 **msinfo32**。
+如果显示“传统/Legacy”，先看[附录 B.6](#legacy)，不要直接照本例修改启动模式。
 
-若结果是“传统/Legacy”，不要直接禁用 CSM 或强行改 UEFI，先核对现有 Windows 的启动配置。双系统应保持启动模式一致。[Ubuntu UEFI 说明](https://help.ubuntu.com/community/UEFI)
+### 2. 查询 BitLocker
 
-### 3.2 如何打开管理员命令提示符
-
-1. 按 `Win + S`，输入 `cmd`，先不按回车。
-2. 在**搜索结果中的“命令提示符”**上右键。
-3. 选择“以管理员身份运行”，权限提示点“是”。若要求管理员密码，需要有权限的账户。
-4. 标题通常显示“管理员：命令提示符”。
-
-另一个入口是 `Win + X → 终端（管理员）`，名称可能随版本不同。
-
-**别点错：**右键黑色窗口的标题栏打开的是字体、颜色等属性，不会变成管理员；设置中的“系统 → 高级 → 终端”也不是管理员启动入口。不需要开启 sudo 或开发人员模式。
-
-### 3.3 查询加密状态
-
-在管理员窗口输入：
+1. 按 **`Win + S`**，输入 `cmd`，先不按回车。
+2. 在搜索结果的 **“命令提示符”**上右键。
+3. 选 **“以管理员身份运行”**，权限提示点“是”。
+4. 在打开的窗口输入下列命令，按回车：
 
 ```bat
 manage-bde -status
 ```
 
-等各卷信息输出完成。只有工具标题或输出为空，不能据此认定没加密；出现“拒绝访问”则重新检查管理员权限。该命令只查询状态，不显示 48 位恢复密码。[Microsoft manage-bde 说明](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/manage-bde)
+查看各盘的 **“转换状态”“已加密百分比”“保护状态”**。本次 C、D、E 都已加密，Ventoy U 盘未加密。具体截图和状态解释见[附录 B.2](#bitlocker-status)。
 
-本次结果：C、D、E 都是加密百分比 100%、保护已启用；F 盘 Ventoy 完全解密、0%、保护关闭。
+### 3. 保存恢复密钥
 
-![C、D 盘 BitLocker 状态](assets/windows-ubuntu-dual-boot/03-bitlocker-c-d.png)
+加密已开启时，先在另一台设备上保存对应的恢复密钥：
 
-*图 1：已成功以管理员身份查询。C、D 的“已解锁”不表示加密已关闭。*
+1. 打开 [微软账户恢复密钥页面](https://account.microsoft.com/devices/recoverykey)。
+2. 登录这台电脑使用的微软账户，查找与本机、相应卷对应的记录。
+3. 保存在手机或其他设备上，确保电脑无法进入 Windows 时也能查看。
 
-![E 盘与 Ventoy U 盘加密状态](assets/windows-ubuntu-dual-boot/04-bitlocker-e-usb.png)
+**恢复密钥只自己保存，不发到聊天或 GitHub。** 工作/学校管理的设备，应向所属组织查询。
 
-*图 2：E 盘加密，Ventoy U 盘未加密。截图拍摄于压缩 E 盘之前。*
-
-理解三个区别：
-
-- **已解锁**：当前 Windows 能读取该卷。
-- **暂停保护/保护关闭**：不能仅凭此项断定数据已解密。
-- **完全解密 + 0%**：该卷解密已完成。
-
-备份恢复密钥也不会关闭加密。
-
-### 3.4 保存恢复密钥；管理入口闪退怎么办
-
-常规入口是“管理 BitLocker → 对应卷 → 备份恢复密钥”。设置里也可能有“隐私和安全性 → 设备加密 → BitLocker 驱动器加密/查找恢复密钥”。Windows 版本不同，界面会有差异。
-
-本次遇到搜索无结果、管理入口闪退。**仅凭闪退不能确定原因，也不能证明磁盘加密失效。** 可先通过浏览器打开 [微软账户恢复密钥页面](https://account.microsoft.com/devices/recoverykey)，登录电脑使用的账户；工作/学校设备向所属组织查询。
-
-保存与本机及相应卷匹配的记录。恢复界面若显示密钥 ID，应按 ID 匹配。C/D/E 可能各有不同密钥。截图保存在手机等电脑之外，**不要上传 GitHub 或发到聊天**。本指南没有附恢复密钥图片。[Microsoft 设备加密说明](https://support.microsoft.com/en-us/windows/security/encryption/device-encryption-in-windows)
-
-### 3.5 是否必须解密
-
-如果安装器提示 BitLocker 阻止继续并排安装，应退出，回 Windows 关闭相关加密并等待解密完成，再重新安装。**不要通过“擦除磁盘”绕过提示。** [Ubuntu BitLocker 安装说明](https://ubuntu.com/desktop/docs/en/latest/reference/bitlocker-during-ubuntu-installation/)
-
-对应卷的管理界面可提供“关闭 BitLocker”；“设备加密”也可能有总开关。关闭前确认影响哪些卷、恢复密钥已保存，以及 Windows 版本是否允许以后重新启用。关闭会降低相关数据在设备丢失时的保护，不应把所有卷解密写成无条件必做项。
-
-解密开始后接电等待，再运行 `manage-bde -status`，确认相关卷“完全解密”且 0%。**暂停保护不能代替解密。** 若设置仍闪退、无法操作，应单独排查管理问题，不要因此清空 Windows。[Microsoft BitLocker 操作指南](https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/operations-guide)
-
-本例最终 Linux 截图仍显示 Windows 分区为 BitLocker，Ubuntu 已在独立分区。这只证明本机当时状态，不代表任意安装器都允许相同流程。
+**完成标志：**已确认 UEFI；知道磁盘是否加密；加密盘的恢复密钥可在其他设备上查看。加密状态不等于安装失败，若后面的安装器要求解密，按[附录 B.4](#bitlocker-block)处理。
 
 <a id="space"></a>
-## 4. 分配 300GB 硬盘空间
+## 步骤 3：从 E 盘分出 300GB 给 Ubuntu
 
-> 已经有 Ubuntu 分区时不要重复此节，跳到第 8 节。
+> 本步骤只用于首次安装。已经安装旧 Ubuntu 的情况，使用[附录 A](#reinstall)重用旧分区。
 
-### 4.1 先看清物理磁盘
+### 1. 打开磁盘管理
 
-按 `Win + R`，输入 `diskmgmt.msc`，回车并最大化，查看下半部分。
+1. 按 **`Win + R`**。
+2. 输入 **`diskmgmt.msc`**，按回车。
+3. 最大化窗口，看下半部分的 **“磁盘 0”“磁盘 1”**和各分区。
 
-![压缩前的磁盘布局](assets/windows-ubuntu-dual-boot/01-before-shrink.png)
+![本次压缩前的磁盘布局](assets/windows-ubuntu-dual-boot/01-before-shrink.png)
 
-*图 3：C/D/E 在磁盘 0；磁盘 1 是 Ventoy。D 与 E 之间的 900MB 空闲不足以安装桌面系统。*
+*压缩前：C、D、E 都在内部磁盘 0；磁盘 1 是 Ventoy U 盘。*
 
-本次压缩前：
+本次 E 盘约 **476.93GB**，空闲约 **344.66GB**，因此选择从 E 盘分出 300GB。C 盘剩余空间少，本次不从 C 盘取空间。
 
-- C：99.05GB，空闲 10.88GB，不再从它压缩。
-- D：375.94GB，空闲 318.84GB，也可以取空间。
-- E：476.93GB，空闲 344.66GB，最后选它分出 300GB。
+### 2. 压缩 E 盘
 
-### 4.2 分多少；D/E 能否一起分
+1. 右键下半部分的 **E 盘分区**。
+2. 选择 **“压缩卷”**，等待查询完成。
+3. 确认“可用压缩空间大小”至少为 **307200MB**。
+4. 在“输入压缩空间量”填写：
 
-基础学习、开发可以考虑约 100GB 起步，Docker、仿真、数据集需要更多余量，按用途决定。本次 300GB 是个人选择，不是统一最低要求。
+```text
+307200
+```
 
-普通数据分区有足够空间就可以压缩，不限 C 或 D。曾考虑 D、E 各 200GB，但两块空闲会被剩余 E 分区隔开，不能直接合成一个连续的普通 ext4 分区。可以分别做 `/`、`/home`，但容量分别计算，不会自动借用。新手用一整块空间更容易管理。
+5. 点击 **“压缩”**，等待完成。
 
-### 4.3 从 E 盘压缩 300GB
+如果上限不足，先按[附录 B.5](#shrink-limit)处理，不通过删除卷解决。
 
-1. 右键 **E → 压缩卷**，等待查询。
-2. “可用压缩空间大小”至少为 **307200MB** 才执行本例方案。
-3. 输入压缩空间量 **`307200`**，点“压缩”。
-4. 完成后保持右侧 **300.00GB 未分配**，不新建简单卷、不格式化。
+### 3. 保留“未分配”空间
 
-Windows 压缩框常用数值：100GB 填 102400MB，150GB 填 153600MB，200GB 填 204800MB，300GB 填 307200MB。
+压缩完成后，E 盘右侧应出现黑色横条标识的 **300.00GB“未分配”**。
 
-![压缩后的 300GB 未分配空间](assets/windows-ubuntu-dual-boot/02-after-shrink.png)
+![本次压缩后的磁盘布局](assets/windows-ubuntu-dual-boot/02-after-shrink.png)
 
-*图 4：E 缩为 176.93GB，空闲约 44.67GB；右边是 Ubuntu 要用的 300GB。此时只完成空间准备。*
+*压缩后：E 盘约 176.93GB、空闲约 44.67GB；右侧 300GB 未分配用于 Ubuntu。*
 
-文件空闲量充足不保证可压缩量一定够，不可移动文件等可能限制它。上限不足时先记录弹窗，不要删卷强行解决。EFI、恢复分区不参与压缩。
+**保持“未分配”，不要新建简单卷，也不要格式化。** 原有的 EFI 和恢复分区保持不动。
+
+**完成标志：**磁盘管理里明确出现了约 300GB 未分配空间。
 
 <a id="ventoy"></a>
-## 5. 制作 Ventoy 启动 U 盘
+## 步骤 4：使用 Ventoy 制作启动 U 盘
 
-1. 从 [Ventoy 官网](https://www.ventoy.net/en/download.html) 下载 Windows 版并解压。
-2. 插 U 盘，运行 `Ventoy2Disk.exe`，按需接受管理员提示。
-3. 核对设备容量和型号。本次约 64GB U 盘，绝不能误选约 1TB 内部硬盘。
-4. 点“安装”。**首次安装 Ventoy 会清除 U 盘数据**，先确认目标正确。
-5. 完成后打开大的 Ventoy 数据分区，复制 22.04.4 ISO。
-6. 不解压 ISO，不改小的 `VTOYEFI` 分区，等复制完成后安全弹出。
+### 1. 打开 Ventoy
 
-已有可用 Ventoy 时，更换版本只需复制新 ISO，**不必再次点 Ventoy 的安装按钮**。允许放多个 ISO，但移除错版本可避免后面选错。[Ventoy 入门说明](https://www.ventoy.net/en/doc_start.html)
+1. 插入 U 盘。
+2. 打开步骤 1 解压的 Ventoy 文件夹。
+3. 双击 **`Ventoy2Disk.exe`**，权限提示按需点“是”。
+
+### 2. 选择并初始化 U 盘
+
+1. 在“设备”列表选中 U 盘。
+2. 根据容量和型号再次核对：本次是约 64GB U 盘，**不能选约 1TB 的内部硬盘**。
+3. 点击 **“安装”**，确认清除的是这个 U 盘，等待完成。
+
+**已有可用 Ventoy 的 U 盘，跳过初始化，直接复制 ISO。**
+
+### 3. 复制 Ubuntu ISO
+
+1. 打开资源管理器中的 **Ventoy 盘**，本次盘符为 F。
+2. 将 **`ubuntu-22.04.4-desktop-amd64.iso`** 复制进去。
+3. 不解压，不改小的 `VTOYEFI` 分区。
+4. 等复制完成，再安全弹出。
+
+**完成标志：**Ventoy 数据分区里能看到完整的 22.04.4 ISO 文件。至此只完成启动盘准备，Ubuntu 还没有安装到硬盘。
 
 <a id="boot"></a>
-## 6. 从 U 盘启动与 Secure Boot 排障
+## 步骤 5：重启电脑，从 U 盘启动 Ubuntu
 
-### 6.1 Windows 中进入启动选择
+### 1. 进入启动选择页面
 
-1. U 盘插着，保存工作。
-2. 按住 `Shift`，点击“电源 → 重启”。
-3. 蓝色菜单出现后松开，选“使用设备”。
-4. 选择带 UEFI、USB 或 U 盘名称的正确启动项。
+1. 重新插好 Ventoy U 盘，保存 Windows 中正在做的工作。
+2. 按住 **Shift**，同时点击 **开始 → 电源 → 重启**。
+3. 蓝色选项页面出现后松开 Shift。
+4. 选择 **“使用设备”**。
+5. 选择带有 **UEFI、USB 或 U 盘名称**的正确启动项。
 
-没有该入口，可尝试“疑难解答 → 高级选项 → UEFI 固件设置 → 重启”，然后用固件启动菜单选择 U 盘；或者按厂商规定的开机启动菜单键。**F2、F12、Esc 等并不通用，进入 BIOS 的键也不一定是启动菜单键**，按具体型号手册核对。
+没有该选项或不知道开机按键时，见[附录 B.6](#legacy)。本次保持 UEFI 和现有安全设置，不需要预先关闭 Secure Boot。
 
-保持与 Windows 一致的 UEFI 模式。不要顺手改 Legacy/CSM、RAID/RST/AHCI 或清除 TPM。
+### 2. 在 Ventoy 中选择镜像
 
-### 6.2 本次遇到的蓝色验证错误
-
-用户照片上显示：
-
-```text
-Verification failed: (0x1A) Security Violation
-```
-
-随后：
+1. 用方向键选中：
 
 ```text
-Shim UEFI key management
-Press any key to perform MOK management
+ubuntu-22.04.4-desktop-amd64.iso
 ```
 
-这是启动签名验证问题，不能据此判断 Ubuntu 分区坏了。确认 U 盘来自自己准备的官方 Ventoy 后，常见登记步骤是：
+2. 按回车。
+3. 如果出现二级菜单，选择 **“Boot in normal mode”**，再按回车。
 
-1. 错误框选 **OK** 并回车。
-2. MOK 倒计时结束前按回车进入菜单。
-3. 选 **Enroll key from disk**。
-4. 选 **VTOYEFI** 对应分区。
-5. 选 **ENROLL_THIS_KEY_IN_MOKMANAGER.cer**。
-6. 按页面依次 **Continue → Yes → Reboot**。
-7. 重启后重新选择 U 盘。
+若出现蓝色 **Security Violation / MOK** 页面，按[附录 B.1](#secure-boot-error)处理，再回到这里。
 
-这是让电脑信任 Ventoy 证书，不是 BitLocker 恢复密钥。证书可能随 Ventoy 版本更新，文件名/菜单不同时按对应版本官方说明核对。不能登记来源不明的证书；Ventoy 默认验证策略与直接启动 Ubuntu 官方介质也不相同，这是一次信任变更。[Ventoy Secure Boot 说明](https://www.ventoy.net/en/doc_secure.html)
+### 3. 进入试用桌面
 
-Ubuntu 支持 Secure Boot，**禁用它不是固定必做步骤**。[Ubuntu 安全启动说明](https://documentation.ubuntu.com/security/security-features/platform-protections/secure-boot/) 登记仍失败时查 Ventoy 版本、兼容说明和具体错误；旧镜像签名撤销等问题也可能导致启动失败，不能保证所有 0x1A 都靠登记解决。不要清空安全启动密钥。若确需修改固件安全设置，先确保 Windows 恢复密钥可用。
+1. Ubuntu 启动菜单中选择 **“Try or Install Ubuntu”**。
+2. 等待加载，在欢迎界面选择语言。
+3. 点击 **“Try Ubuntu / 试用 Ubuntu”**。
+4. 检查显示、键盘、触摸板和 Wi-Fi 能否使用。
 
-### 6.3 选择镜像，进入试用
+**完成标志：**进入 Ubuntu 试用桌面，基本硬件可用。先不要拔 U 盘。
 
-1. Ventoy 菜单选 `ubuntu-22.04.4-desktop-amd64.iso`。
-2. 二级菜单若出现，选 **Boot in normal mode**。
-3. Ubuntu 菜单选 **Try or Install Ubuntu**，欢迎界面选 **Try Ubuntu / 试用 Ubuntu**。
-4. 检查 Wi-Fi、显示、键盘和触摸板。
+<a id="install-options"></a>
+## 步骤 6：打开安装程序，填写基本选项
 
-试用终端可检查启动模式：
+### 1. 启动安装程序
 
-```bash
-test -d /sys/firmware/efi && echo UEFI || echo Legacy
-```
+双击试用桌面的 **“Install Ubuntu 22.04.4 LTS”**。
 
-本机应输出 UEFI。若是 Legacy，重新以 UEFI 启动再安装。硬件不能用时先解决兼容问题，格式化分区不能修复驱动缺失。
+### 2. 选择语言和键盘
+
+1. 选择 **简体中文**或自己习惯的语言，点“继续”。
+2. 根据实际键盘选择布局。
+3. 在测试输入框输入几个字符，确认键盘正常，点“继续”。
+
+### 3. 选择安装内容
+
+1. 日常使用可选 **“正常安装”**。
+2. 为先得到本次要求的 22.04.4 初始环境，安装阶段先不联网，**不勾选“安装 Ubuntu 时下载更新”**。
+3. 第三方显卡/无线驱动按硬件需要处理；离线无法下载的可在安装后使用“附加驱动”安装。
+4. 点“继续”，进入安装类型页面。
+
+如果安装第三方驱动时要求设置 Secure Boot/MOK 密码，记录好该密码，之后可能需要登记驱动。
+
+**完成标志：**到达“安装类型”或磁盘分区页面，尚未确认写入硬盘。
 
 <a id="install"></a>
-## 7. 首次安装 Ubuntu
+## 步骤 7：选择 Ubuntu 安装分区，开始安装
 
-### 7.1 前面的基本选项
+> 以下是**首次安装到预留空间**的操作。已安装旧 Ubuntu 时，改用[附录 A 的重装分区设置](#reinstall)，不要新建另一套系统。
 
-双击试用桌面的“Install Ubuntu 22.04.4 LTS”。选择语言、键盘布局并测试输入。
+### 1. 选择“其他选项”
 
-正常安装提供更多常用软件，最小安装更精简。复现原始 22.04.4 时先离线，不勾安装更新。第三方显卡/无线驱动按硬件需要安装；离线不能取得的驱动可之后在“软件和更新 → 附加驱动”处理。
+在“安装类型”页面选择 **“其他选项 / Something else”**。
 
-### 7.2 选择安装位置
+本次已在 Windows 预留空间，使用手动分区明确安装位置。**不要选择“擦除磁盘”，也不要点击“新建分区表”。** 如果安装器明确提示 BitLocker 阻止继续，先按[附录 B.4](#bitlocker-block)处理。
 
-若正确识别 Windows，安装器可能提供“与 Windows Boot Manager 共存”。即使选择它，也须核对实际目标和空间，不能看到“共存”就直接写入。
+### 2. 在 300GB 空闲空间内建立 Ubuntu 分区
 
-本例已预留 300GB，使用手动分区可明确位置：
+1. 找到内部约 **1TB** 的硬盘，本次设备名为 **`/dev/nvme0n1`**。
+2. 找到步骤 3 预留的 **300GiB 左右空闲空间**。安装器可能显示约 322GB，这是计量单位不同。
+3. 选中这块空闲，点击 **“+”**建立分区。
+4. 使用这块空闲的可用容量；位置如需选择，可放在该空闲空间的起始处。
+5. “用于”选择 **“Ext4 日志文件系统”**。
+6. “挂载点”选择 **`/`**。
+7. 点“确定”。
 
-1. 安装类型选 **其他选项 / Something else**。
-2. 在内部约 1TB 磁盘上找到预留的 **300GiB 空闲**；十进制显示可能约 322GB/322122MB。
-3. 在该空闲中新建 ext4 分区，挂载点 **`/`**，只用这块已确认的空间。
-4. 复用内部已有 EFI 系统分区，**不格式化**。22.04 界面可能显示“用于：EFI 系统分区”，不一定有普通挂载点下拉框。
-5. 如有“安装启动引导器的设备”，核对为内部整盘，例如本例 `/dev/nvme0n1`，而非 Ventoy U 盘。UEFI 下还需确认实际 EFI 分区，不能只看底部设备框。
+此方案使用一整个 Ubuntu 系统分区，个人文件也存放在其中；本次无需额外切出 `/home` 或 swap 分区。
 
-**不选“新建分区表”，不擦除整盘，不删除 Windows/恢复分区。** 本机 100MB EFI 是已有布局，不是建议新机器统一建立 100MB；若提示 EFI 空间不足，先检查，不能靠格式化引导分区腾空间。
+### 3. 复用已有 EFI 引导分区
 
-本例使用单个 ext4 根分区，`/home` 是其内部目录，不单独划分。系统可使用 swap 文件，不必照旧系统另建 8GB swap 分区。
+1. 找到内部硬盘已有的 **EFI 系统分区**；本次为 **`/dev/nvme0n1p1`，100MB，FAT/vfat**。
+2. 确認它用于 **EFI 系统分区**。
+3. **不勾选格式化，不删除它。** 它同时保存 Windows 的启动文件。
+4. 如果界面提供挂载点，其用途对应 **`/boot/efi`**；有些界面直接显示“EFI 系统分区”，不用强找挂载点选项。
 
-若 BitLocker 阻止继续，回第 3.5 节。若出现 LVM、Linux 加密或不同布局，先核对后再做，不能套用普通 ext4 方案。
+100MB 是本机已有容量，不是通用的新建规格。若提示 EFI 空间不足，先查看[附录 B.9](#partition-unexpected)。
 
-### 7.3 写入前确认与安装
+### 4. 确认启动引导器位置
 
-点“现在安装”后检查摘要：只在所选空闲空间创建 Linux 文件系统，Windows、恢复、EFI 不应被格式化。读不懂时取消确认，保存完整列表和摘要再核对。
+如底部有 **“安装启动引导器的设备”**，选择内部整盘 **`/dev/nvme0n1`**，不要选 Ventoy U 盘。
 
-选择时区，例如 Shanghai，设置姓名、用户名、计算机名和密码。保持电源连接直到安装完成。若第三方驱动要求设置 MOK 密码，记住它，它不是 BitLocker 密钥。
+同时核对上一步实际使用的 EFI 分区确实在内部硬盘上，不能只看底部设备框。
+
+### 5. 核对修改，确认安装
+
+1. 检查 Windows 的 C/D/E、恢复分区均没有被删除或勾选格式化。
+2. 点击 **“现在安装”**。
+3. 阅读弹出的磁盘修改摘要，确认只在预留空间建立 Linux 文件系统，**没有格式化 Windows、恢复或 EFI 分区**。
+4. 确认正确后点“继续”。
+
+分区名称和本例不同、或摘要看不懂时，先取消确认，保存完整分区列表再核对。
+
+### 6. 设置账户并等待
+
+1. 时区选择 **Shanghai / 上海**。
+2. 设置姓名、计算机名、用户名、登录密码。
+3. 继续安装，保持电源和 U 盘连接。
+4. 等待出现 **“安装完成”**提示。
+
+**完成标志：**安装器明确提示安装完成，并提供“现在重启”。
+
+<a id="verify"></a>
+## 步骤 8：重启，分别检查 Ubuntu 和 Windows
+
+### 1. 拔掉安装 U 盘
+
+1. 点击 **“现在重启”**。
+2. 看到以下提示后，拔掉 U 盘，再按回车：
+
+```text
+Please remove the installation medium, then press ENTER
+```
+
+3. 启动菜单出现时选择 **Ubuntu**。
+
+### 2. 确认 Ubuntu 版本和安装位置
+
+进入桌面后按 **`Ctrl + Alt + T`**，依次执行：
+
+```bash
+lsb_release -d
+findmnt /
+df -h /
+```
+
+- 离线按指定镜像安装后，应显示 **Ubuntu 22.04.4 LTS**。
+- 根目录应来自内部 Linux 分区，而不是 U 盘试用环境的 `overlay`。
+- 检查网络、显示、声音、键盘和触摸板。
+
+### 3. 确认 Windows 可用
+
+1. 正常重启。
+2. 在启动菜单中选择 **Windows Boot Manager**。
+3. 确认 Windows 可进入，C/D/E 的文件正常。
+4. 如果要求 BitLocker 恢复密钥，按页面密钥 ID 匹配自己保存的记录并输入。
+
+没有系统选择菜单时看[附录 B.7](#missing-ubuntu)；驱动密钥登记或更新后的版本变化见[附录 B.8](#updates)。
+
+**完成标志：**拔掉 U 盘后，Ubuntu 和 Windows 都能独立启动。之后再开始配置开发环境。
+
+---
+
+## 文末补充：只在需要时查阅
+
+- [附录 A：安装错版本后如何替换为 22.04.4](#reinstall)
+- [附录 B：启动、BitLocker、分区和安装排错](#troubleshooting)
+- [附录 C：内存、硬盘、ISO 等概念与常见疑问](#concepts)
+- [附录 D：只读检查命令与写入前核对清单](#checks)
+- [附录 E：官方资料与本次记录说明](#sources)
 
 <a id="reinstall"></a>
-## 8. 已装错版本：替换成 22.04.4
+## 附录 A：装错版本后，替换成 Ubuntu 22.04.4
 
-### 8.1 根据进度选择处理方式
+### A.1 根据进度选择处理方式
 
 - **只下载/复制错 ISO**：更换 ISO，硬盘系统不用动。
 - **只进过 Try Ubuntu**：退出试用，换 ISO 重启。
@@ -310,13 +322,13 @@ test -d /sys/firmware/efi && echo UEFI || echo Legacy
 
 本次属于第三种。无须提前在 Windows 删除 Linux 分区，更不能删剩余 E 盘。
 
-### 8.2 换 ISO 后怎么进旧 Ubuntu
+### A.2 换 ISO 后怎么进旧 Ubuntu
 
 正常退出并安全弹出 U 盘，重启选内部 **ubuntu** 启动项。直接进 Windows 时可尝试 `Shift + 重启 → 使用设备 → ubuntu`，没有该项就查固件启动菜单。
 
 进 Windows 不表示 Ubuntu 被删。暂时找不到旧启动项，也可以从新 ISO 的试用环境查看分区，不用先修好旧系统才重装。正在运行 U 盘试用系统时不要直接拔 U 盘。
 
-### 8.3 查看旧系统的准确分区
+### A.3 查看旧系统的准确分区
 
 在硬盘已安装的 Ubuntu 中按 `Ctrl + Alt + T`，依次执行：
 
@@ -348,18 +360,18 @@ Filesystem          Size  Used  Avail  Use%  Mounted on
 
 `loop0`、`loop1` 等 squashfs 通常是 Snap 软件挂载，不是需要逐个删掉的硬盘分区。
 
-### 8.4 替换安装镜像
+### A.4 替换安装镜像
 
 回 Windows 或其他能复制文件的系统，插入 Ventoy：
 
 1. 可删除旧的 `ubuntu-26.04.1-desktop-amd64.iso` 和不需要的 22.04.5 ISO。
 2. 复制 `ubuntu-22.04.4-desktop-amd64.iso`，不解压。
 3. 等复制完成、安全弹出。
-4. 按第 6 节从正确镜像进入试用桌面。
+4. 按正文步骤 5从正确镜像进入试用桌面。
 
 Ventoy 不重装，E 盘不再压缩。删除旧 ISO 不会清除旧 Ubuntu。
 
-### 8.5 在正确安装器中重用旧分区
+### A.5 在正确安装器中重用旧分区
 
 先备份旧 Ubuntu 内需要的文件。下面操作会清除 p7 内的旧系统、用户文件、软件和配置。
 
@@ -389,87 +401,225 @@ Ventoy 不重装，E 盘不再压缩。删除旧 ISO 不会清除旧 Ubuntu。
 
 本次采用干净重装，不采用“保留新版系统文件、不格式化”的跨版本回退方式，避免新旧系统和配置混杂。
 
-<a id="verify"></a>
-## 9. 重启与双系统验收
+确认写入后，设置时区和账户，等待安装结束。然后按正文[步骤 8](#verify)拔掉 U 盘、验证 22.04.4 和 Windows。无需回到首次安装的“新建分区”步骤。
 
-1. 安装完成后点“现在重启”。
-2. 出现 `Please remove the installation medium, then press ENTER` 时拔掉 U 盘，再按回车。
-3. 若有驱动 MOK 登记页面，使用安装时设置的驱动登记密码。页面不符或没设置过时不要猜密码。
-4. 进入硬盘 Ubuntu，执行：
+<a id="troubleshooting"></a>
+## 附录 B：操作中遇到差错时再看
 
-```bash
-lsb_release -d
-uname -r
-findmnt /
-df -h /
+<a id="secure-boot-error"></a>
+### B.1 Secure Boot / Security Violation / MOK 蓝色页面
+
+用户照片上显示：
+
+```text
+Verification failed: (0x1A) Security Violation
 ```
 
-离线按指定镜像安装后应显示 22.04.4，记录内核版本；根目录应来自内部 Linux 分区而非试用 overlay。
+随后：
 
-5. 检查网络、显示、声音、输入设备。
-6. 再重启选 **Windows Boot Manager**，确认 Windows 能启动、C/D/E 文件正常。
-7. 如出现 BitLocker 恢复界面，按密钥 ID 匹配保存的密钥并输入，不要清除 TPM。
-8. Windows 下可再次 `manage-bde -status`，确认是否需要恢复自己之前主动暂停的保护。
+```text
+Shim UEFI key management
+Press any key to perform MOK management
+```
 
-两个系统都验证后，再配置机器人开发工具。正常安装 22.04 安全更新；如果项目需要保持 22.04，不接受升级到其他发行版的大版本提示。
+这是启动签名验证问题，不能据此判断 Ubuntu 分区坏了。确认 U 盘来自自己准备的官方 Ventoy 后，常见登记步骤是：
+
+1. 错误框选 **OK** 并回车。
+2. MOK 倒计时结束前按回车进入菜单。
+3. 选 **Enroll key from disk**。
+4. 选 **VTOYEFI** 对应分区。
+5. 选 **ENROLL_THIS_KEY_IN_MOKMANAGER.cer**。
+6. 按页面依次 **Continue → Yes → Reboot**。
+7. 重启后重新选择 U 盘。
+
+这是让电脑信任 Ventoy 证书，不是 BitLocker 恢复密钥。证书可能随 Ventoy 版本更新，文件名/菜单不同时按对应版本官方说明核对。不能登记来源不明的证书；Ventoy 默认验证策略与直接启动 Ubuntu 官方介质也不相同，这是一次信任变更。[Ventoy Secure Boot 说明](https://www.ventoy.net/en/doc_secure.html)
+
+Ubuntu 支持 Secure Boot，**禁用它不是固定必做步骤**。[Ubuntu 安全启动说明](https://documentation.ubuntu.com/security/security-features/platform-protections/secure-boot/) 登记仍失败时查 Ventoy 版本、兼容说明和具体错误；旧镜像签名撤销等问题也可能导致启动失败，不能保证所有 0x1A 都靠登记解决。不要清空安全启动密钥。若确需修改固件安全设置，先确保 Windows 恢复密钥可用。
+
+
+<a id="bitlocker-status"></a>
+### B.2 管理员窗口打不开，或者命令没有结果
+
+**管理员入口找错了：**按 `Win + S` 搜索 `cmd`，右键的是搜索结果中的“命令提示符”，再选“以管理员身份运行”。黑色窗口标题栏的属性、设置页面中的终端选项都不是这个入口，不需要开启 sudo 或开发人员模式。
+
+**只有标题、没有卷信息：**先等命令完成；若提示拒绝访问，重新以管理员身份打开。持续无输出也不能当作未加密。应看到每个卷的转换状态、加密百分比、保护状态。
+
+查询成功后的本次结果：C、D、E 都是加密百分比 100%、保护已启用；F 盘 Ventoy 完全解密、0%、保护关闭。
+
+![C、D 盘 BitLocker 状态](assets/windows-ubuntu-dual-boot/03-bitlocker-c-d.png)
+
+*图 1：已成功以管理员身份查询。C、D 的“已解锁”不表示加密已关闭。*
+
+![E 盘与 Ventoy U 盘加密状态](assets/windows-ubuntu-dual-boot/04-bitlocker-e-usb.png)
+
+*图 2：E 盘加密，Ventoy U 盘未加密。截图拍摄于压缩 E 盘之前。*
+
+理解三个区别：
+
+- **已解锁**：当前 Windows 能读取该卷。
+- **暂停保护/保护关闭**：不能仅凭此项断定数据已解密。
+- **完全解密 + 0%**：该卷解密已完成。
+
+备份恢复密钥也不会关闭加密。
+
+
+<a id="bitlocker-crash"></a>
+### B.3 搜索不到 BitLocker，管理入口闪退
+
+本次在设置中找到了“隐私和安全性 → 设备加密”，其管理入口点击后闪退。仅凭此现象无法确定原因，不能据此判断加密坏了。
+
+可以先通过 [微软账户恢复密钥页面](https://account.microsoft.com/devices/recoverykey) 保存恢复密钥；工作/学校管理的设备向所属组织查询。根据设备和密钥 ID 核对，C/D/E 可能有不同记录。
+
+如果下一步确实需要解密，而相关设置仍不可用，应单独排查该管理问题，不用删除 Windows 分区解决。
+
+<a id="bitlocker-block"></a>
+### B.4 安装器要求关闭 BitLocker
+
+如果安装器提示 BitLocker 阻止继续并排安装，应退出，回 Windows 关闭相关加密并等待解密完成，再重新安装。**不要通过“擦除磁盘”绕过提示。** [Ubuntu BitLocker 安装说明](https://ubuntu.com/desktop/docs/en/latest/reference/bitlocker-during-ubuntu-installation/)
+
+对应卷的管理界面可提供“关闭 BitLocker”；“设备加密”也可能有总开关。关闭前确认影响哪些卷、恢复密钥已保存，以及 Windows 版本是否允许以后重新启用。关闭会降低相关数据在设备丢失时的保护，不应把所有卷解密写成无条件必做项。
+
+解密开始后接电等待，再运行 `manage-bde -status`，确认相关卷“完全解密”且 0%。**暂停保护不能代替解密。** 若设置仍闪退、无法操作，应单独排查管理问题，不要因此清空 Windows。[Microsoft BitLocker 操作指南](https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/operations-guide)
+
+本例最终 Linux 截图仍显示 Windows 分区为 BitLocker，Ubuntu 已在独立分区。这只证明本机当时状态，不代表任意安装器都允许相同流程。
+
+
+<a id="shrink-limit"></a>
+### B.5 E 盘空闲足够，却压缩不了 300GB
+
+文件空闲容量不等于可压缩上限，不可移动文件等因素可能限制压缩。
+
+1. 保留“压缩卷”窗口，记录可压缩量。
+2. 可以在足够保留 Windows 日常空间的前提下，选择较小的 Ubuntu 容量，或重新规划其他数据分区。
+3. 不删卷，不动 EFI/恢复分区，不反复强行操作。
+
+窗口中的常用换算：100GB 填 102400MB；150GB 填 153600MB；200GB 填 204800MB；300GB 填 307200MB。
+
+<a id="legacy"></a>
+### B.6 没有“使用设备”，或不知道开机按什么键
+
+**Windows 没有“使用设备”：**尝试“疑难解答 → 高级选项 → UEFI 固件设置 → 重启”，再在固件启动菜单选择 U 盘。也可使用厂商指定的开机启动菜单键。
+
+**快捷键不确定：**查电脑具体型号的官方手册。F2、F12、Esc 等不是通用规则，BIOS 设置键与一次性启动菜单键也可能不同。
+
+**`msinfo32` 显示“传统/Legacy”：**本指南正文按本机 UEFI 编写。先确认现有 Windows 的引导和分区方案，不能直接切换 UEFI、禁用 CSM 后照做。[Ubuntu UEFI 说明](https://help.ubuntu.com/community/UEFI)
+
+**检查 U 盘是否真的以 UEFI 启动：**在 Ubuntu 试用终端执行：
+
+```bash
+test -d /sys/firmware/efi && echo UEFI || echo Legacy
+```
+
+本案例应输出 UEFI。若为 Legacy，重新选择 UEFI U 盘启动项。
+
+<a id="missing-ubuntu"></a>
+### B.7 重启直接进 Windows，找不到 Ubuntu
+
+1. 如果目的是进入硬盘上已安装的系统，正常退出后安全拔掉安装 U 盘。
+2. 尝试 `Shift + 重启 → 使用设备 → ubuntu`。
+3. 没有 ubuntu 项时查看固件的一次性启动菜单。
+4. 仍找不到时，用 U 盘试用环境运行 `lsblk` 查看布局，再排查引导，不先删分区重装。
+
+只更换 U 盘 ISO 不会删除已安装系统。正常进入 Windows 只说明这次启动选择了 Windows，不能证明 Ubuntu 消失。
+
+<a id="updates"></a>
+### B.8 驱动登记、安装更新与版本变化
+
+**驱动 MOK 登记：**若安装第三方驱动时设置过登记密码，重启可能出现 Enroll MOK 页面，按提示用该密码完成。它不同于 Ventoy 证书登记、Ubuntu 登录密码和 BitLocker 恢复密钥。未设置过或页面不一致时先核对提示，不猜密码。
+
+**更新后不再显示 22.04.4：**正常的 22.04 软件更新可能使版本显示为较新的 22.04.x，与升级到 24.04/26.04 不同。不要为了保留版本字符串长期停用安全更新。
+
+若课程严格依赖旧内核或软件版本，应另外记录 `uname -r` 和关键软件版本，按课程要求管理环境。仅凭系统版本字符串无法保证整个开发环境一致。
+
+<a id="partition-unexpected"></a>
+### B.9 分区、EFI 空间、挂载或硬件提示与正文不同
+
+- **EFI 空间不足：**100MB 是本机已有布局，不是通用建议。先查占用和安装器要求，不能格式化 EFI 来腾空间。
+- **出现 LVM、Linux 加密或不同容量/设备名：**不要套用本例 p7 的操作，先识别实际布局。
+- **提示分区已挂载：**确认在 U 盘试用环境，关闭正在访问旧分区的文件管理器；不对正在运行的根目录强制卸载。
+- **最终摘要要格式化 Windows/恢复/EFI：**取消确认，回分区页面重新检查。
+- **试用环境无网络或显示异常：**先排查 22.04.4 对硬件的支持；重新格式化不会修复驱动缺失。
+
+<a id="concepts"></a>
+## 附录 C：看不懂的概念与常见疑问
+
+### C.1 运行内存不是硬盘容量
+
+- **RAM（运行内存）**是程序运行时使用的空间。本次 `free -h` 照片中总量约 30GiB、已用约 2.3GiB，是正常系统占用。双系统切换启动时不必把 RAM 永久分成两半。
+- **硬盘空间**用于保存系统、软件和文件。本次给 Ubuntu 的 **300GB** 属于这一类。
+- **swap（交换空间）**是内存辅助空间。照片中的 8GiB swap 不代表系统分区大小，也不要求新安装照建 8GB swap 分区。
+
+查内存用 `free -h`；查当前 Ubuntu 系统分区容量用 `df -h /`；查磁盘布局用 `lsblk`。
+
+### C.2 C、D、E 不一定是三块硬盘
+
+本次 C/D/E 都位于同一块约 1TB 内部硬盘。Windows 显示“磁盘 0”，Linux 显示 `/dev/nvme0n1`。
+
+从 E 盘压缩出的 300GB 是独立未分配空间。安装后 Ubuntu 使用自己的分区，**不在剩余 E 盘的某个文件夹里**。
+
+### C.3 ISO、Ventoy、试用系统与已安装系统
+
+ISO 是安装镜像；Ventoy 让 U 盘能够启动镜像。复制 ISO 只代表准备好了安装介质，**不代表完成安装**。
+
+“Try Ubuntu”是从 U 盘启动的试用环境。安装到硬盘后，拔掉 U 盘仍能启动的才是已安装系统。删除 U 盘里的旧 ISO 不会卸载硬盘中的 Ubuntu；换 ISO 也不会自动降级旧系统。
 
 <a id="faq"></a>
-## 10. 本次常见问题
+### C.4 本次常见问题
 
-### “ISO 已放 U 盘，是不是只剩配置环境？”
+#### “ISO 已放 U 盘，是不是只剩配置环境？”
 
 还差启动安装器、安装到内部硬盘、拔掉 U 盘验证。试用桌面不等于安装完成。
 
-### “只能从 C、D 分，不能 E？”
+#### “只能从 C、D 分，不能 E？”
 
 E 也可以。看空间与所在物理硬盘，不看盘符。E 如果在另一块硬盘，要另行规划引导位置。
 
-### “D/E 各分 200GB，会得到一个 400GB 吗？”
+#### “D/E 各分 200GB，会得到一个 400GB 吗？”
 
 本例两块空间不相邻，普通分区不能直接合并。可分别挂载 `/`、`/home`，但容量分别计算。
 
-### “管理员终端在哪？终端属性里没有？”
+#### “管理员终端在哪？终端属性里没有？”
 
 在 Windows 搜索结果上右键“以管理员身份运行”。黑色窗口标题栏的属性不是管理员入口，设置里的 sudo 不用开。
 
-### “命令没结果是不是没加密？”
+#### “命令没结果是不是没加密？”
 
 不是，等待完成或处理权限错误。一定以实际卷状态为准。“已解锁”也不是“完全解密”。
 
-### “管理 BitLocker 闪退？”
+#### “管理 BitLocker 闪退？”
 
 原因尚未确认。可先从微软账户保存恢复密钥；确需解密而设置不可用时单独排查，不清空 Windows。
 
-### “Secure Boot 报错，必须关闭吗？”
+#### “Secure Boot 报错，必须关闭吗？”
 
 不是。本次已进入 Ventoy MOK 管理流程，可以按官方说明登记。仍失败则看具体兼容问题，不盲目清空密钥。
 
-### “换版本，直接删 E 盘吗？”
+#### “换版本，直接删 E 盘吗？”
 
 不。E 是 Windows 数据分区；旧 Ubuntu 在独立 p7。本例在正确安装器内只格式化 p7 来替换。
 
-### “free -h 用了 2.3GiB，要删掉吗？”
+#### “free -h 用了 2.3GiB，要删掉吗？”
 
 它是 RAM 的正常运行占用。磁盘用 `df -h /` 看，本次约 17GiB；原根分区格式化后旧内容才被清除。
 
-### “换了 U 盘 ISO，还能进原 Ubuntu？”
+#### “换了 U 盘 ISO，还能进原 Ubuntu？”
 
 可以，U 盘文件与硬盘安装是两回事。正常退出并拔掉安装 U 盘，再选内部 ubuntu 启动项。
 
-### “重启直接进 Windows，Ubuntu 消失了？”
+#### “重启直接进 Windows，Ubuntu 消失了？”
 
 不一定，可能只是默认启动项。先查固件启动菜单和磁盘布局，再排查引导，不先删分区。
 
-### “Windows 磁盘管理不显示 Ubuntu 使用量？”
+#### “Windows 磁盘管理不显示 Ubuntu 使用量？”
 
 Windows 通常不能原生读 ext4。没有盘符或显示异常空闲比例不代表内容为空，使用 Linux 检查。
 
-### “300GB 为什么会变 322GB 或 295G？”
+#### “300GB 为什么会变 322GB 或 295G？”
 
 分区工具的十进制/二进制单位不同，文件系统还有开销和保留空间。结合分区名、位置、类型判断，不能只比数字。
 
 <a id="checks"></a>
-## 11. 只读检查命令与最终核对
+## 附录 D：只读检查命令与最终核对
 
 **Windows 运行窗口（Win + R），每次一条：**
 
@@ -500,6 +650,16 @@ free -h
 
 这些命令本身不格式化。本指南不提供可能误复制的删除分区命令，磁盘写入通过安装器确认。
 
+### 下载和复制后的文件校验
+
+在 Windows PowerShell 中，把路径替换成实际文件位置后执行：
+
+```powershell
+Get-FileHash -Algorithm SHA256 -LiteralPath 'D:\Downloads\ubuntu-22.04.4-desktop-amd64.iso'
+```
+
+与官方 [SHA256SUMS](https://old-releases.ubuntu.com/releases/22.04.4/SHA256SUMS) 中同一文件名的哈希比较。U 盘中的文件也可以按其路径再检查，确认复制完整。
+
 ### 最后一次写入前
 
 - [ ] ISO 确为 `ubuntu-22.04.4-desktop-amd64.iso`。
@@ -512,7 +672,7 @@ free -h
 - [ ] 完成后拔 U 盘，分别验证 Ubuntu 和 Windows。
 
 <a id="sources"></a>
-## 12. 来源和图片说明
+## 附录 E：资料来源与本次记录说明
 
 ### 官方资料
 
@@ -526,6 +686,12 @@ free -h
 - [Microsoft 设备加密](https://support.microsoft.com/en-us/windows/security/encryption/device-encryption-in-windows)
 
 核对日期为 2026-09-07。当前官方网页可能针对新版安装器；本文目标为 22.04.4，具体按钮文字可能不同。
+
+### 本次已经确认的状态
+
+本文基于实际对话、用户截图和官方资料整理，日期为 2026-09-07。Windows 使用 UEFI，C/D/E 开启 BitLocker；从 E 盘分出 300GB；旧 Ubuntu 已安装在独立 ext4 分区并成功启动。
+
+**尚未收到重装 22.04.4 成功的验收结果。** 附录 A 是基于已核实分区给出的替换方案，不将后续操作写成已经完成。
 
 ### 实际截图和记录边界
 

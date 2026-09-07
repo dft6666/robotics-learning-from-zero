@@ -4,6 +4,6 @@
 
 ## 环境搭建
 
-- [Windows + Ubuntu 双系统安装与版本重装指南](docs/windows-ubuntu-dual-boot.md)：基于实际操作，包含 Ventoy、UEFI、BitLocker、300GB 分区、Secure Boot 排障，以及将已安装的新版本替换为 **Ubuntu 22.04.4** 的详细步骤，附 4 张实际截图。
+- [Windows + Ubuntu 双系统安装与版本重装指南](docs/windows-ubuntu-dual-boot.md)：正文按 **8 个步骤**完成 Ubuntu 22.04.4 双系统安装，每步写明操作和完成标志，附实际分区截图。装错版本后的重装方法、Secure Boot 和 BitLocker 排错、常见疑问集中在文末附录。
 
 指南中的分区编号属于本次案例，操作其他电脑时必须重新核对。
